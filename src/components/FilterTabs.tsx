@@ -1,5 +1,3 @@
-// src/components/FilterTabs.tsx
-
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { theme } from '../constants/theme';

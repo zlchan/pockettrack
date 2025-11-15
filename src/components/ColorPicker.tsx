@@ -1,5 +1,3 @@
-// src/components/ColorPicker.tsx
-
 import React from 'react';
 import {
   View,

@@ -1,5 +1,3 @@
-// src/screens/ManageCategoryScreen.tsx
-
 import React, { useState } from 'react';
 import {
   View,

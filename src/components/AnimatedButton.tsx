@@ -1,5 +1,3 @@
-// src/components/AnimatedButton.tsx
-
 import React, { useRef } from 'react';
 import {
   TouchableOpacity,

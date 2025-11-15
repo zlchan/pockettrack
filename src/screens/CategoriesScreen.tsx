@@ -1,5 +1,3 @@
-// src/screens/CategoriesScreen.tsx
-
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

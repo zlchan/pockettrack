@@ -1,5 +1,3 @@
-// src/screens/SummaryScreen.tsx
-
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
