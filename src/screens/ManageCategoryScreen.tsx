@@ -53,7 +53,7 @@ export const ManageCategoryScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -66,9 +66,7 @@ export const ManageCategoryScreen = () => {
           <Text style={styles.headerTitle}>
             {isEdit ? 'Edit Category' : 'Add Category'}
           </Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={styles.saveButton}>Save</Text>
-          </TouchableOpacity>
+          <View style={{ width: 28 }} />
         </View>
 
         <View style={styles.content}>
@@ -153,6 +151,15 @@ export const ManageCategoryScreen = () => {
           onSelect={setColor}
           onClose={() => setShowColorPicker(false)}
         />
+        
+        {/* Floating Save Button */}
+        <TouchableOpacity 
+          style={styles.saveButtonContainer} 
+          onPress={handleSave}
+          disabled={isEdit && category?.isDefault}
+        >
+          <Ionicons name="checkmark" size={28} color={theme.colors.primary} />
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -181,14 +188,23 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
   },
-  saveButton: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
+  saveButtonContainer: {
+    position: 'absolute',
+    right: theme.spacing.lg,
+    bottom: theme.spacing.lg,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.colors.text,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.medium,
+    elevation: 8,
   },
   content: {
     flex: 1,
     padding: theme.spacing.lg,
+    paddingBottom: 90, // Space for save button
   },
   previewContainer: {
     alignItems: 'center',

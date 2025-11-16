@@ -113,7 +113,7 @@ export const AddExpenseScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -126,9 +126,7 @@ export const AddExpenseScreen = () => {
           <Text style={styles.headerTitle}>
             {isEdit ? 'Edit Expense' : 'Add Expense'}
           </Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={styles.saveButton}>Save</Text>
-          </TouchableOpacity>
+          <View style={{ width: 28 }} />
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -247,6 +245,11 @@ export const AddExpenseScreen = () => {
             />
           </View>
         </ScrollView>
+        
+        {/* Floating Save Button */}
+        <TouchableOpacity style={styles.saveButtonContainer} onPress={handleSave}>
+          <Ionicons name="checkmark" size={28} color={theme.colors.primary} />
+        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -275,14 +278,23 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
   },
-  saveButton: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
+  saveButtonContainer: {
+    position: 'absolute',
+    right: theme.spacing.lg,
+    bottom: theme.spacing.lg,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.colors.text,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.medium,
+    elevation: 8,
   },
   content: {
     flex: 1,
     padding: theme.spacing.lg,
+    paddingBottom: 90, // Space for save button
   },
   amountContainer: {
     flexDirection: 'row',
