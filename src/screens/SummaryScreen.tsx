@@ -168,7 +168,7 @@ export const SummaryScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Summary</Text>
         <FilterTabs selected={filter} onSelect={handleFilterChange} />

@@ -38,9 +38,9 @@ const DEFAULT_CATEGORIES: Category[] = [
     createdAt: new Date().toISOString(),
   },
     {
-    id: 'cat_entertainment',
+    id: 'cat_sports',
     name: 'Sports',
-    icon: 'sports',
+    icon: 'fitness',
     color: '#d9ff00ff',
     isDefault: true,
     createdAt: new Date().toISOString(),
