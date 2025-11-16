@@ -29,6 +29,7 @@ const TabNavigator = () => {
           paddingTop: 8,
           paddingBottom: 8,
           height: 60,
+          position: 'absolute',
         },
         tabBarLabelStyle: {
           fontSize: 12,

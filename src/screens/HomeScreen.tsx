@@ -178,7 +178,7 @@ export const HomeScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <FlatList
         ListHeaderComponent={renderHeader}
         data={groupedExpenses}

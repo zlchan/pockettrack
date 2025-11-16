@@ -21,10 +21,19 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.albertchan31.PocketTrack"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bb901a75-0d0d-4d4e-9d8f-2949707a4204"
+      }
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
