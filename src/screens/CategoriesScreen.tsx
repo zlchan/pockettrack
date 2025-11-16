@@ -132,7 +132,7 @@ export const CategoriesScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Categories</Text>
@@ -141,9 +141,6 @@ export const CategoriesScreen = () => {
             <Text style={styles.totalAmount}>{formatCurrency(monthlyTotal)}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={handleAddCategory}>
-          <Ionicons name="add" size={24} color={theme.colors.primary} />
-        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -154,6 +151,11 @@ export const CategoriesScreen = () => {
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
       />
+      
+      {/* Floating Action Button */}
+      <TouchableOpacity style={styles.fab} onPress={handleAddCategory}>
+        <Ionicons name="add" size={32} color={theme.colors.primary} />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -193,17 +195,22 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
   },
-  addButton: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.full,
+  fab: {
+    position: 'absolute',
+    right: theme.spacing.lg,
+    bottom: 100, // Above tab bar
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: theme.colors.text,
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.medium,
+    elevation: 8,
   },
   listContent: {
     padding: theme.spacing.lg,
+    paddingBottom: 100, // Extra space for tab bar
   },
   item: {
     flexDirection: 'row',

@@ -106,11 +106,6 @@ export const HomeScreen = () => {
   };
 
   const renderHeader = () => {
-    const spin = rotateAnim.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '90deg'],
-    });
-
     return (
       <View style={styles.headerContainer}>
         <View style={styles.header}>
@@ -118,15 +113,6 @@ export const HomeScreen = () => {
             <Text style={styles.headerSubtitle}>This Month</Text>
             <Text style={styles.headerAmount}>{formatCurrency(monthlyTotal)}</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.addButton} 
-            onPress={handleAddExpense}
-            activeOpacity={0.8}
-          >
-            <Animated.View style={{ transform: [{ rotate: spin }] }}>
-              <Ionicons name="add" size={28} color={theme.colors.primary} />
-            </Animated.View>
-          </TouchableOpacity>
         </View>
 
         {/* Time Filter Tabs */}
@@ -178,7 +164,7 @@ export const HomeScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
         ListHeaderComponent={renderHeader}
         data={groupedExpenses}
@@ -205,6 +191,20 @@ export const HomeScreen = () => {
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
       />
+      
+      {/* Floating Action Button */}
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={handleAddExpense}
+        activeOpacity={0.8}
+      >
+        <Animated.View style={{ transform: [{ rotate: rotateAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: ['0deg', '90deg'],
+        }) }] }}>
+          <Ionicons name="add" size={32} color={theme.colors.primary} />
+        </Animated.View>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
@@ -237,14 +237,18 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
   },
-  addButton: {
-    width: 56,
-    height: 56,
-    borderRadius: theme.borderRadius.full,
+  fab: {
+    position: 'absolute',
+    right: theme.spacing.lg,
+    bottom: 100, // Above tab bar
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: theme.colors.text,
     justifyContent: 'center',
     alignItems: 'center',
     ...theme.shadows.medium,
+    elevation: 8,
   },
   filterContainer: {
     flexDirection: 'row',
@@ -298,7 +302,7 @@ const styles = StyleSheet.create({
   listContent: {
     padding: theme.spacing.lg,
     paddingTop: 0,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100, // Extra space for tab bar
   },
   section: {
     marginBottom: theme.spacing.lg,
