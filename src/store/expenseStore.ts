@@ -8,7 +8,7 @@ const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat_food',
     name: 'Food',
-    icon: 'restaurant',
+    icon: 'fast-food',
     color: '#F59E0B',
     isDefault: true,
     createdAt: new Date().toISOString(),
@@ -32,16 +32,16 @@ const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat_bills',
     name: 'Bills',
-    icon: 'receipt',
+    icon: 'document-text',
     color: '#EF4444',
     isDefault: true,
     createdAt: new Date().toISOString(),
   },
-    {
+  {
     id: 'cat_sports',
     name: 'Sports',
-    icon: 'fitness',
-    color: '#d9ff00ff',
+    icon: 'barbell',
+    color: '#10B981',
     isDefault: true,
     createdAt: new Date().toISOString(),
   },
@@ -56,15 +56,15 @@ const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat_health',
     name: 'Health',
-    icon: 'fitness',
-    color: '#10B981',
+    icon: 'medkit',
+    color: '#16A34A',
     isDefault: true,
     createdAt: new Date().toISOString(),
   },
   {
     id: 'cat_other',
     name: 'Other',
-    icon: 'ellipsis-horizontal',
+    icon: 'ellipsis-horizontal-circle',
     color: '#6B7280',
     isDefault: true,
     createdAt: new Date().toISOString(),

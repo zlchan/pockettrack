@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { useExpenseStore } from '../store/expenseStore';
-import { CategoryIcon } from '../components/CategoryIcon';
+import { SwipeableCategoryItem } from '../components/SwipeableCategoryItem';
 import { formatCurrency } from '../utils/dateUtils';
 import { theme } from '../constants/theme';
 import { RootStackParamList, Category } from '../types';
@@ -80,46 +80,15 @@ export const CategoriesScreen = () => {
   };
 
   const renderItem = ({ item }: { item: typeof categoryData[0] }) => (
-    <TouchableOpacity 
-      style={styles.item}
+    <SwipeableCategoryItem
+      category={item}
+      amount={item.amount}
+      percentage={item.percentage}
+      expenseCount={item.expenseCount}
       onPress={() => handleEditCategory(item)}
-      onLongPress={() => handleDeleteCategory(item)}
-    >
-      <CategoryIcon icon={item.icon} color={item.color} size={48} />
-      
-      <View style={styles.content}>
-        <View style={styles.nameRow}>
-          <Text style={styles.categoryName}>{item.name}</Text>
-          {!item.isDefault && (
-            <TouchableOpacity
-              onPress={() => handleDeleteCategory(item)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="trash-outline" size={16} color={theme.colors.error} />
-            </TouchableOpacity>
-          )}
-        </View>
-        {item.amount > 0 && (
-          <>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill,
-                  { width: `${Math.min(item.percentage, 100)}%`, backgroundColor: item.color }
-                ]} 
-              />
-            </View>
-            <Text style={styles.percentage}>
-              {item.percentage.toFixed(1)}% · {item.expenseCount} expense{item.expenseCount !== 1 ? 's' : ''}
-            </Text>
-          </>
-        )}
-      </View>
-
-      <Text style={[styles.amount, { color: item.amount > 0 ? theme.colors.text : theme.colors.textSecondary }]}>
-        {formatCurrency(item.amount)}
-      </Text>
-    </TouchableOpacity>
+      onEdit={() => handleEditCategory(item)}
+      onDelete={() => handleDeleteCategory(item)}
+    />
   );
 
   const renderEmpty = () => (
@@ -211,51 +180,6 @@ const styles = StyleSheet.create({
   listContent: {
     padding: theme.spacing.lg,
     paddingBottom: 100, // Extra space for tab bar
-  },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.small,
-  },
-  content: {
-    flex: 1,
-    marginLeft: theme.spacing.md,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xs,
-  },
-  categoryName: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
-    flex: 1,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: theme.borderRadius.full,
-    overflow: 'hidden',
-    marginBottom: theme.spacing.xs,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: theme.borderRadius.full,
-  },
-  percentage: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.textSecondary,
-  },
-  amount: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.bold,
-    marginLeft: theme.spacing.md,
   },
   emptyContainer: {
     flex: 1,
