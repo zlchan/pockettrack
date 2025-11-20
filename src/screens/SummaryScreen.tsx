@@ -3,11 +3,14 @@ import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useExpenseStore } from '../store/expenseStore';
 import { FilterTabs, FilterPeriod } from '../components/FilterTabs';
+import { MonthlySpendingChart } from '../components/MonthlySpendingChart';
+import { CategoryPieChart } from '../components/CategoryPieChart';
+import { WeeklyTrendChart } from '../components/WeeklyTrendChart';
 import { formatCurrency } from '../utils/dateUtils';
 import { theme } from '../constants/theme';
 
 export const SummaryScreen = () => {
-  const { expenses, getCategoryById } = useExpenseStore();
+  const { expenses, categories, getCategoryById } = useExpenseStore();
   const [filter, setFilter] = useState<FilterPeriod>('month');
   const fadeAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -26,6 +29,77 @@ export const SummaryScreen = () => {
     ]).start();
     setFilter(period);
   };
+
+  // Calculate chart data
+  const chartData = useMemo(() => {
+    const now = new Date();
+
+    // Weekly Trend (Last 7 days)
+    const weeklyData = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dayExpenses = expenses.filter(e => {
+        const expenseDate = new Date(e.date);
+        return expenseDate >= dayStart && expenseDate <= dayEnd;
+      });
+
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      weeklyData.push({
+        day: i === 0 ? 'Today' : dayNames[date.getDay()],
+        amount: dayExpenses.reduce((sum, e) => sum + e.amount, 0),
+      });
+    }
+
+    // Monthly Spending (Last 6 months)
+    const monthlyData = [];
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+
+      const monthExpenses = expenses.filter(e => {
+        const expenseDate = new Date(e.date);
+        return expenseDate >= monthStart && expenseDate <= monthEnd;
+      });
+
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      monthlyData.push({
+        month: i === 0 ? 'This' : monthNames[date.getMonth()],
+        amount: monthExpenses.reduce((sum, e) => sum + e.amount, 0),
+      });
+    }
+
+    // Category Breakdown (This month)
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisMonthExpenses = expenses.filter(e => new Date(e.date) >= thisMonthStart);
+    
+    const categoryTotals = new Map<string, number>();
+    thisMonthExpenses.forEach(expense => {
+      const current = categoryTotals.get(expense.categoryId) || 0;
+      categoryTotals.set(expense.categoryId, current + expense.amount);
+    });
+
+    const total = Array.from(categoryTotals.values()).reduce((sum, val) => sum + val, 0);
+
+    const categoryData = Array.from(categoryTotals.entries())
+      .map(([categoryId, amount]) => {
+        const category = getCategoryById(categoryId);
+        return {
+          name: category?.name || 'Unknown',
+          amount,
+          color: category?.color || '#6B7280',
+          percentage: total > 0 ? (amount / total) * 100 : 0,
+        };
+      })
+      .sort((a, b) => b.amount - a.amount);
+
+    return { weeklyData, monthlyData, categoryData };
+  }, [expenses, categories]);
 
   const stats = useMemo(() => {
     const now = new Date();
@@ -48,80 +122,18 @@ export const SummaryScreen = () => {
         break;
     }
 
-    // Get previous period dates
-    let prevStartDate: Date;
-    let prevEndDate: Date;
-
-    switch (filter) {
-      case 'day':
-        prevStartDate = new Date(startDate);
-        prevStartDate.setDate(startDate.getDate() - 1);
-        prevEndDate = new Date(startDate);
-        prevEndDate.setMilliseconds(-1);
-        break;
-      case 'week':
-        prevStartDate = new Date(startDate);
-        prevStartDate.setDate(startDate.getDate() - 7);
-        prevEndDate = new Date(startDate);
-        prevEndDate.setMilliseconds(-1);
-        break;
-      case 'month':
-      default:
-        prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-    }
-
-    // Filter by date range (inclusive of past, present, and future within range)
     const currentExpenses = expenses.filter(e => {
       const expenseDate = new Date(e.date);
       return expenseDate >= startDate && expenseDate <= endDate;
     });
 
-    const previousExpenses = expenses.filter(e => {
-      const expenseDate = new Date(e.date);
-      return expenseDate >= prevStartDate && expenseDate <= prevEndDate;
-    });
-
     const currentTotal = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const previousTotal = previousExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-    const avgExpense =
-      currentExpenses.length > 0 ? currentTotal / currentExpenses.length : 0;
-
-    const change = previousTotal > 0
-      ? ((currentTotal - previousTotal) / previousTotal) * 100
-      : currentTotal > 0 ? 100 : 0;
-
-    const allTimeTotal = expenses.reduce((sum, e) => sum + e.amount, 0);
-
-    // Get highest expense in current period
-    const highestExpense = currentExpenses.length > 0
-      ? currentExpenses.reduce((max, e) => e.amount > max.amount ? e : max)
-      : null;
-
-    // Calculate daily average for the period
-    const daysInPeriod = filter === 'day' ? 1 : 
-                        filter === 'week' ? 7 : 
-                        new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const dailyAverage = currentTotal / daysInPeriod;
-
-    // Count future expenses
-    const futureExpenses = expenses.filter(e => new Date(e.date) > now).length;
-    const pastExpenses = expenses.filter(e => new Date(e.date) < new Date(now.getFullYear(), now.getMonth(), now.getDate())).length;
+    const avgExpense = currentExpenses.length > 0 ? currentTotal / currentExpenses.length : 0;
 
     return {
       currentTotal,
-      previousTotal,
       transactionCount: currentExpenses.length,
       avgExpense,
-      change,
-      allTimeTotal,
-      totalExpenses: expenses.length,
-      highestExpense,
-      dailyAverage,
-      futureExpenses,
-      pastExpenses,
     };
   }, [expenses, filter]);
 
@@ -136,39 +148,8 @@ export const SummaryScreen = () => {
     }
   };
 
-  const getPrevPeriodLabel = () => {
-    switch (filter) {
-      case 'day':
-        return 'Yesterday';
-      case 'week':
-        return 'Last Week';
-      case 'month':
-        return 'Last Month';
-    }
-  };
-
-  const StatCard = ({ 
-    label, 
-    value, 
-    sublabel,
-    highlight,
-  }: { 
-    label: string; 
-    value: string; 
-    sublabel?: string;
-    highlight?: boolean;
-  }) => (
-    <View style={[styles.statCard, highlight && styles.statCardHighlight]}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, highlight && styles.statValueHighlight]}>
-        {value}
-      </Text>
-      {sublabel && <Text style={styles.statSublabel}>{sublabel}</Text>}
-    </View>
-  );
-
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Summary</Text>
         <FilterTabs selected={filter} onSelect={handleFilterChange} />
@@ -179,7 +160,7 @@ export const SummaryScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Current Period */}
+        {/* Current Period Summary */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{getPeriodLabel()}</Text>
           <View style={styles.mainCard}>
@@ -189,141 +170,38 @@ export const SummaryScreen = () => {
             <Text style={styles.mainSubtext}>
               {stats.transactionCount} transaction{stats.transactionCount !== 1 ? 's' : ''}
             </Text>
-            {stats.change !== 0 && (
-              <View style={styles.changeContainer}>
-                <Text
-                  style={[
-                    styles.changeText,
-                    { color: stats.change > 0 ? theme.colors.error : theme.colors.success },
-                  ]}
-                >
-                  {stats.change > 0 ? '↑' : '↓'} {Math.abs(stats.change).toFixed(1)}% vs {getPrevPeriodLabel().toLowerCase()}
-                </Text>
-              </View>
-            )}
           </View>
+        </View>
+
+        {/* Weekly Trend Chart */}
+        <View style={styles.section}>
+          <WeeklyTrendChart data={chartData.weeklyData} />
+        </View>
+
+        {/* Category Pie Chart */}
+        <View style={styles.section}>
+          <CategoryPieChart data={chartData.categoryData} />
+        </View>
+
+        {/* Monthly Spending Chart */}
+        <View style={styles.section}>
+          <MonthlySpendingChart data={chartData.monthlyData} />
         </View>
 
         {/* Quick Stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Averages</Text>
-          <View style={styles.row}>
-            <StatCard
-              label="Per Transaction"
-              value={formatCurrency(stats.avgExpense)}
-            />
-            <StatCard
-              label="Per Day"
-              value={formatCurrency(stats.dailyAverage)}
-            />
-          </View>
-        </View>
-
-        {/* Highest Expense */}
-        {stats.highestExpense && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Highest Expense</Text>
-            <View style={styles.highlightCard}>
-              <View style={styles.highlightTop}>
-                <Text style={styles.highlightTitle}>
-                  {stats.highestExpense.title}
-                </Text>
-                <Text style={styles.highlightCategory}>
-                  {getCategoryById(stats.highestExpense.categoryId)?.name}
-                </Text>
-              </View>
-              <Text style={styles.highlightAmount}>
-                {formatCurrency(stats.highestExpense.amount)}
-              </Text>
-              <Text style={styles.highlightDate}>
-                {new Date(stats.highestExpense.date).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </Text>
+          <Text style={styles.sectionTitle}>Quick Stats</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Average</Text>
+              <Text style={styles.statValue}>{formatCurrency(stats.avgExpense)}</Text>
+              <Text style={styles.statSublabel}>per transaction</Text>
             </View>
-          </View>
-        )}
-
-        {/* Comparison */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Period Comparison</Text>
-          <View style={styles.comparisonRow}>
-            <View style={styles.comparisonItem}>
-              <Text style={styles.comparisonLabel}>{getPeriodLabel()}</Text>
-              <Text style={styles.comparisonAmount}>
-                {formatCurrency(stats.currentTotal)}
-              </Text>
-              <Text style={styles.comparisonCount}>
-                {stats.transactionCount} expenses
-              </Text>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Total</Text>
+              <Text style={styles.statValue}>{stats.transactionCount}</Text>
+              <Text style={styles.statSublabel}>transactions</Text>
             </View>
-            <View style={styles.comparisonDivider} />
-            <View style={styles.comparisonItem}>
-              <Text style={styles.comparisonLabel}>{getPrevPeriodLabel()}</Text>
-              <Text style={[styles.comparisonAmount, styles.comparisonAmountPrev]}>
-                {formatCurrency(stats.previousTotal)}
-              </Text>
-              <Text style={styles.comparisonCount}>
-                {expenses.filter(e => {
-                  const expenseDate = new Date(e.date);
-                  let prevStartDate: Date;
-                  let prevEndDate: Date;
-                  const now = new Date();
-                  
-                  if (filter === 'day') {
-                    prevStartDate = new Date(now);
-                    prevStartDate.setDate(now.getDate() - 1);
-                    prevStartDate.setHours(0, 0, 0, 0);
-                    prevEndDate = new Date(now);
-                    prevEndDate.setHours(0, 0, 0, -1);
-                  } else if (filter === 'week') {
-                    const dayOfWeek = now.getDay();
-                    prevStartDate = new Date(now);
-                    prevStartDate.setDate(now.getDate() - dayOfWeek - 7);
-                    prevStartDate.setHours(0, 0, 0, 0);
-                    prevEndDate = new Date(now);
-                    prevEndDate.setDate(now.getDate() - dayOfWeek);
-                    prevEndDate.setMilliseconds(-1);
-                  } else {
-                    prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-                    prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
-                  }
-                  
-                  return expenseDate >= prevStartDate && expenseDate <= prevEndDate;
-                }).length} expenses
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* All Time */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>All Time Statistics</Text>
-          <View style={styles.row}>
-            <StatCard
-              label="Total Spent"
-              value={formatCurrency(stats.allTimeTotal)}
-              highlight
-            />
-            <StatCard
-              label="Total Expenses"
-              value={stats.totalExpenses.toString()}
-              highlight
-            />
-          </View>
-          <View style={styles.row}>
-            <StatCard
-              label="Past Expenses"
-              value={stats.pastExpenses.toString()}
-              sublabel="recorded"
-            />
-            <StatCard
-              label="Future Expenses"
-              value={stats.futureExpenses.toString()}
-              sublabel="scheduled"
-            />
           </View>
         </View>
       </Animated.ScrollView>
@@ -354,7 +232,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
+    paddingBottom: 100,
   },
   section: {
     marginBottom: theme.spacing.xl,
@@ -384,28 +262,17 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.xs,
   },
-  changeContainer: {
-    marginTop: theme.spacing.md,
-  },
-  changeText: {
-    fontSize: theme.fontSize.md,
-    fontWeight: theme.fontWeight.semibold,
-  },
-  row: {
+  statsGrid: {
     flexDirection: 'row',
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.md,
   },
   statCard: {
     flex: 1,
     backgroundColor: theme.colors.surface,
     padding: theme.spacing.lg,
     borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
     ...theme.shadows.small,
-  },
-  statCardHighlight: {
-    borderWidth: 2,
-    borderColor: theme.colors.text,
   },
   statLabel: {
     fontSize: theme.fontSize.sm,
@@ -416,75 +283,9 @@ const styles = StyleSheet.create({
     fontSize: theme.fontSize.xl,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
-  },
-  statValueHighlight: {
-    fontSize: theme.fontSize.xxl,
+    marginBottom: theme.spacing.xs,
   },
   statSublabel: {
-    fontSize: theme.fontSize.xs,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
-  },
-  highlightCard: {
-    backgroundColor: theme.colors.surface,
-    padding: theme.spacing.lg,
-    borderRadius: theme.borderRadius.md,
-    ...theme.shadows.small,
-  },
-  highlightTop: {
-    marginBottom: theme.spacing.md,
-  },
-  highlightTitle: {
-    fontSize: theme.fontSize.lg,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  highlightCategory: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.textSecondary,
-  },
-  highlightAmount: {
-    fontSize: theme.fontSize.xxl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.expense,
-    marginBottom: theme.spacing.xs,
-  },
-  highlightDate: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.textSecondary,
-  },
-  comparisonRow: {
-    flexDirection: 'row',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    overflow: 'hidden',
-    ...theme.shadows.small,
-  },
-  comparisonItem: {
-    flex: 1,
-    padding: theme.spacing.lg,
-    alignItems: 'center',
-  },
-  comparisonDivider: {
-    width: 1,
-    backgroundColor: theme.colors.border,
-  },
-  comparisonLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.sm,
-  },
-  comparisonAmount: {
-    fontSize: theme.fontSize.xl,
-    fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-  },
-  comparisonAmountPrev: {
-    color: theme.colors.textSecondary,
-  },
-  comparisonCount: {
     fontSize: theme.fontSize.xs,
     color: theme.colors.textSecondary,
   },
