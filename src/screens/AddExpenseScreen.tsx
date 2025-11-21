@@ -1,3 +1,5 @@
+// src/screens/AddExpenseScreen.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -6,9 +8,9 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
   Platform,
   Alert,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -17,6 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useExpenseStore } from '../store/expenseStore';
 import { CategoryIcon } from '../components/CategoryIcon';
+import { NumericKeypad } from '../components/NumericKeypad';
 import { RootStackParamList } from '../types';
 import { theme } from '../constants/theme';
 
@@ -37,11 +40,36 @@ export const AddExpenseScreen = () => {
   const [note, setNote] = useState(expense?.note || '');
   const [date, setDate] = useState(expense?.date ? new Date(expense.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [activeInput, setActiveInput] = useState<'amount' | 'title' | 'note' | null>('amount');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   // Initialize categories if empty
   useEffect(() => {
     const initStore = useExpenseStore.getState();
     initStore.initializeCategories();
+  }, []);
+
+  // Listen to keyboard events
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+        // Return to amount input when device keyboard closes
+        setActiveInput('amount');
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
   }, []);
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -74,21 +102,35 @@ export const AddExpenseScreen = () => {
     });
   };
 
+  const formatAmountDisplay = (value: string): string => {
+    if (!value) return '0.00';
+    const num = parseFloat(value);
+    if (isNaN(num)) return '0.00';
+    return num.toFixed(2);
+  };
+
   const handleSave = () => {
+    // Validate before saving
+    if (!validateAndSave()) {
+      return;
+    }
+  };
+
+  const validateAndSave = (): boolean => {
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a title');
-      return;
+      return false;
     }
 
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
-      return;
+      return false;
     }
 
     if (!categoryId) {
       Alert.alert('Error', 'Please select a category');
-      return;
+      return false;
     }
 
     if (isEdit && expense) {
@@ -110,14 +152,26 @@ export const AddExpenseScreen = () => {
     }
 
     navigation.goBack();
+    return true;
+  };
+
+  const handleTitleFocus = () => {
+    setActiveInput('title');
+  };
+
+  const handleNoteFocus = () => {
+    setActiveInput('note');
+  };
+
+  const handleAmountFocus = () => {
+    // Dismiss device keyboard if visible
+    Keyboard.dismiss();
+    setActiveInput('amount');
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={styles.flex}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -129,30 +183,45 @@ export const AddExpenseScreen = () => {
           <View style={{ width: 28 }} />
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {/* Amount Input */}
-          <View style={styles.amountContainer}>
+        <ScrollView 
+          style={styles.content} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Amount Display */}
+          <TouchableOpacity 
+            style={[
+              styles.amountContainer,
+              activeInput === 'amount' && !keyboardVisible && styles.amountContainerActive,
+            ]}
+            onPress={handleAmountFocus}
+            activeOpacity={0.7}
+          >
             <Text style={styles.currencySymbol}>$</Text>
-            <TextInput
-              style={styles.amountInput}
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              placeholderTextColor={theme.colors.border}
-              autoFocus={!isEdit}
-            />
-          </View>
+            <Text style={[
+              styles.amountDisplay,
+              activeInput === 'amount' && !keyboardVisible && styles.amountDisplayActive,
+            ]}>
+              {formatAmountDisplay(amount)}
+            </Text>
+          </TouchableOpacity>
 
           {/* Title Input */}
           <View style={styles.section}>
             <Text style={styles.label}>Title</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                activeInput === 'title' && styles.inputActive,
+              ]}
               value={title}
               onChangeText={setTitle}
               placeholder="e.g., Lunch at cafe"
               placeholderTextColor={theme.colors.textSecondary}
+              onFocus={handleTitleFocus}
+              maxLength={50}
+              returnKeyType="done"
+              onSubmitEditing={handleAmountFocus}
             />
           </View>
 
@@ -183,7 +252,7 @@ export const AddExpenseScreen = () => {
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={handleDateChange}
-                maximumDate={new Date()} // Can't select future dates
+                maximumDate={new Date()}
               />
             )}
           </View>
@@ -234,7 +303,11 @@ export const AddExpenseScreen = () => {
           <View style={styles.section}>
             <Text style={styles.label}>Note (Optional)</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[
+                styles.input, 
+                styles.textArea,
+                activeInput === 'note' && styles.inputActive,
+              ]}
               value={note}
               onChangeText={setNote}
               placeholder="Add a note..."
@@ -242,15 +315,26 @@ export const AddExpenseScreen = () => {
               multiline
               numberOfLines={3}
               textAlignVertical="top"
+              onFocus={handleNoteFocus}
+              maxLength={200}
+              returnKeyType="done"
+              onSubmitEditing={handleAmountFocus}
+              blurOnSubmit={true}
             />
           </View>
+
+          <View style={{ height: 20 }} />
         </ScrollView>
         
-        {/* Floating Save Button */}
-        <TouchableOpacity style={styles.saveButtonContainer} onPress={handleSave}>
-          <Ionicons name="checkmark" size={28} color={theme.colors.primary} />
-        </TouchableOpacity>
-      </KeyboardAvoidingView>
+        {/* Custom Numeric Keypad - Show when amount is active and device keyboard is hidden */}
+        {activeInput === 'amount' && !keyboardVisible && (
+          <NumericKeypad
+            value={amount}
+            onValueChange={setAmount}
+            onSave={validateAndSave}
+          />
+        )}
+      </View>
     </SafeAreaView>
   );
 };
@@ -278,41 +362,40 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
   },
-  saveButtonContainer: {
-    position: 'absolute',
-    right: theme.spacing.lg,
-    bottom: theme.spacing.lg,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: theme.colors.text,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.medium,
-    elevation: 8,
-  },
   content: {
     flex: 1,
     padding: theme.spacing.lg,
-    paddingBottom: 90, // Space for save button
   },
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: theme.spacing.xxl,
+    paddingVertical: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+  },
+  amountContainerActive: {
+    borderColor: theme.colors.text,
+    backgroundColor: theme.colors.surface,
   },
   currencySymbol: {
     fontSize: 48,
     fontWeight: theme.fontWeight.bold,
-    color: theme.colors.text,
+    color: theme.colors.textSecondary,
     marginRight: theme.spacing.sm,
   },
-  amountInput: {
+  amountDisplay: {
     fontSize: 56,
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
     minWidth: 150,
+  },
+  amountDisplayActive: {
+    color: theme.colors.text,
   },
   section: {
     marginBottom: theme.spacing.xl,
@@ -331,8 +414,11 @@ const styles = StyleSheet.create({
     padding: theme.spacing.md,
     fontSize: theme.fontSize.md,
     color: theme.colors.text,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.colors.border,
+  },
+  inputActive: {
+    borderColor: theme.colors.text,
   },
   textArea: {
     minHeight: 100,
@@ -341,7 +427,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.md,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.colors.border,
   },
   dateSelectorLeft: {
@@ -371,7 +457,7 @@ const styles = StyleSheet.create({
     marginRight: theme.spacing.md,
     minWidth: 90,
     backgroundColor: theme.colors.surface,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.colors.border,
   },
   categoryLabel: {
