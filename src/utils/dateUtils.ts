@@ -48,5 +48,38 @@ export const groupExpensesByDate = <T extends { date: string }>(
 };
 
 export const formatCurrency = (amount: number): string => {
-  return `RM ${amount.toFixed(2)}`; // Malaysian Ringgit
+  return `${amount.toFixed(2)}`;
+};
+
+export const getNextOccurrence = (
+  recurrenceType: string,
+  startDate: string,
+  lastGenerated?: string
+): Date | null => {
+  const now = new Date();
+  const start = new Date(startDate);
+  const last = lastGenerated ? new Date(lastGenerated) : new Date(start.getTime() - 1);
+
+  let nextDate = new Date(last);
+
+  switch (recurrenceType) {
+    case 'daily':
+      nextDate.setDate(last.getDate() + 1);
+      break;
+    case 'weekly':
+      nextDate.setDate(last.getDate() + 7);
+      break;
+    case 'monthly':
+      nextDate.setMonth(last.getMonth() + 1);
+      break;
+    default:
+      return null;
+  }
+
+  // If next occurrence is before start date, use start date
+  if (nextDate < start) {
+    return start;
+  }
+
+  return nextDate;
 };

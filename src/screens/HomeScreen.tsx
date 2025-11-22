@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useExpenseStore } from '../store/expenseStore';
 import { SwipeableExpenseItem } from '../components/SwipeableExpenseItem';
-import { groupExpensesByDate, formatDate, formatCurrency } from '../utils/dateUtils';
+import { UpcomingRecurringCard } from '../components/UpcomingRecurringCard';
+import { groupExpensesByDate, formatDate, formatCurrency, getNextOccurrence } from '../utils/dateUtils';
 import { theme } from '../constants/theme';
 import { RootStackParamList } from '../types';
 
@@ -23,7 +24,14 @@ type TimeFilter = 'all' | 'past' | 'today' | 'future';
 
 export const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { expenses, deleteExpense, getMonthlyTotal, getCategoryById, initializeCategories } = useExpenseStore();
+  const { 
+    expenses, 
+    deleteExpense, 
+    getMonthlyTotal, 
+    getCategoryById, 
+    initializeCategories,
+    recurringExpenses,
+  } = useExpenseStore();
   
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
   const rotateAnim = React.useRef(new Animated.Value(0)).current;
@@ -32,6 +40,9 @@ export const HomeScreen = () => {
   // Initialize categories on mount
   useEffect(() => {
     initializeCategories();
+    // Generate any pending recurring expenses
+    const { generateRecurringExpenses } = useExpenseStore.getState();
+    generateRecurringExpenses();
   }, []);
 
   // Filter expenses by time
@@ -59,6 +70,33 @@ export const HomeScreen = () => {
   const groupedExpenses = groupExpensesByDate(filteredExpenses);
   const monthlyTotal = getMonthlyTotal();
 
+  // Calculate upcoming recurring expenses
+  const upcomingRecurring = useMemo(() => {
+    const now = new Date();
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    return recurringExpenses
+      .filter(recurring => {
+        if (!recurring.isActive) return false;
+        if (recurring.endDate && new Date(recurring.endDate) < now) return false;
+        return true;
+      })
+      .map(recurring => {
+        const nextDate = getNextOccurrence(
+          recurring.recurrenceType,
+          recurring.startDate,
+          recurring.lastGenerated
+        );
+        return { recurring, nextDate };
+      })
+      .filter(item => {
+        if (!item.nextDate) return false;
+        return item.nextDate <= thirtyDaysFromNow && item.nextDate >= now;
+      })
+      .sort((a, b) => a.nextDate!.getTime() - b.nextDate!.getTime())
+      .slice(0, 5); // Show max 5 upcoming
+  }, [recurringExpenses]);
+
   const handleAddExpense = () => {
     // Subtle rotation animation on button press
     Animated.sequence([
@@ -82,6 +120,17 @@ export const HomeScreen = () => {
     if (expense) {
       navigation.navigate('AddExpense', { expense });
     }
+  };
+
+  const handleEditRecurring = (recurringId: string) => {
+    const recurring = recurringExpenses.find(r => r.id === recurringId);
+    if (recurring) {
+      navigation.navigate('ManageRecurring', { recurringExpense: recurring });
+    }
+  };
+
+  const handleViewAllRecurring = () => {
+    navigation.navigate('RecurringList' as never);
   };
 
   const getExpenseCountByFilter = (filter: TimeFilter): number => {
@@ -166,7 +215,33 @@ export const HomeScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <FlatList
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={
+          <>
+            {renderHeader()}
+            {upcomingRecurring.length > 0 && (
+              <View style={styles.upcomingSection}>
+                <View style={styles.upcomingSectionHeader}>
+                  <View style={styles.upcomingTitleRow}>
+                    <Ionicons name="time-outline" size={20} color={theme.colors.text} />
+                    <Text style={styles.upcomingSectionTitle}>Upcoming Recurring</Text>
+                  </View>
+                  <TouchableOpacity onPress={handleViewAllRecurring}>
+                    <Text style={styles.viewAllText}>View All</Text>
+                  </TouchableOpacity>
+                </View>
+                {upcomingRecurring.map(({ recurring, nextDate }) => (
+                  <UpcomingRecurringCard
+                    key={recurring.id}
+                    recurring={recurring}
+                    category={getCategoryById(recurring.categoryId)}
+                    nextDate={nextDate!}
+                    onPress={() => handleEditRecurring(recurring.id)}
+                  />
+                ))}
+              </View>
+            )}
+          </>
+        }
         data={groupedExpenses}
         keyExtractor={item => item.date}
         renderItem={({ item }) => (
@@ -333,5 +408,31 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.sm,
     textAlign: 'center',
+  },
+  upcomingSection: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.lg,
+    paddingBottom: theme.spacing.md,
+  },
+  upcomingSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  upcomingTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  upcomingSectionTitle: {
+    fontSize: theme.fontSize.md,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.text,
+  },
+  viewAllText: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.text,
   },
 });

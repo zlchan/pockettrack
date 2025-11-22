@@ -55,6 +55,12 @@ export const ExpenseItem: React.FC<ExpenseItemProps> = ({
           {expense.title}
         </Text>
         <View style={styles.metaRow}>
+          {expense.recurringExpenseId && (
+            <>
+              <Ionicons name="repeat" size={12} color={theme.colors.textSecondary} />
+              <Text style={styles.separator}>•</Text>
+            </>
+          )}
           <Text style={styles.categoryName}>{category.name}</Text>
           {expense.note && (
             <>

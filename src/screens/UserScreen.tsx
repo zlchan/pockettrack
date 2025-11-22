@@ -1,12 +1,23 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { RootStackParamList } from '../types';
 import { useExpenseStore } from '../store/expenseStore';
 import { theme } from '../constants/theme';
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export const UserScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
   const expenses = useExpenseStore(state => state.expenses);
+  const recurringExpenses = useExpenseStore(state => state.recurringExpenses);
+
+  const handleNavigateToRecurring = () => {
+    navigation.navigate('RecurringList' as never);
+  };
 
   const handleClearData = () => {
     Alert.alert(
@@ -74,12 +85,25 @@ export const UserScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
       <View style={styles.content}>
+        {/* Recurring Expenses */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Automation</Text>
+          <View style={styles.card}>
+            <SettingItem
+              icon="repeat"
+              label="Recurring Expenses"
+              value={recurringExpenses.length.toString()}
+              onPress={handleNavigateToRecurring}
+            />
+          </View>
+        </View>
+
         {/* App Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App Info</Text>
@@ -146,6 +170,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: theme.spacing.lg,
+    paddingBottom: 100, // Extra space for tab bar
   },
   section: {
     marginBottom: theme.spacing.xl,

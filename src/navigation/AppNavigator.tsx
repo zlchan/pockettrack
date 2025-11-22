@@ -2,6 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { HomeScreen } from '../screens/HomeScreen';
 import { AddExpenseScreen } from '../screens/AddExpenseScreen';
@@ -9,6 +10,8 @@ import { CategoriesScreen } from '../screens/CategoriesScreen';
 import { SummaryScreen } from '../screens/SummaryScreen';
 import { UserScreen } from '../screens/UserScreen';
 import { ManageCategoryScreen } from '../screens/ManageCategoryScreen';
+import { ManageRecurringScreen } from '../screens/ManageRecurringScreen';
+import { RecurringListScreen } from '../screens/RecurringListScreen';
 import { RootStackParamList, TabParamList } from '../types';
 import { theme } from '../constants/theme';
 
@@ -26,10 +29,9 @@ const TabNavigator = () => {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.border,
           borderTopWidth: 1,
+          height: Platform.OS === 'ios' ? 88 : 68,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
-          position: 'absolute',
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -100,6 +102,20 @@ export const AppNavigator = () => {
           component={ManageCategoryScreen}
           options={{
             presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name="ManageRecurring"
+          component={ManageRecurringScreen}
+          options={{
+            presentation: 'modal',
+          }}
+        />
+        <Stack.Screen
+          name={'RecurringList' as keyof RootStackParamList}
+          component={RecurringListScreen}
+          options={{
+            animation: 'slide_from_right',
           }}
         />
       </Stack.Navigator>
