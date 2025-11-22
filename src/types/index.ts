@@ -7,6 +7,22 @@ export interface Category {
   createdAt: string;
 }
 
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'none';
+
+export interface RecurringExpense {
+  id: string;
+  title: string;
+  amount: number;
+  categoryId: string;
+  note?: string;
+  recurrenceType: RecurrenceType;
+  startDate: string; // ISO string
+  endDate?: string; // ISO string - optional
+  lastGenerated?: string; // ISO string - last time expense was auto-created
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface Expense {
   id: string;
   title: string;
@@ -15,12 +31,14 @@ export interface Expense {
   date: string; // ISO string
   note?: string;
   createdAt: string;
+  recurringExpenseId?: string; // Link to recurring expense if auto-generated
 }
 
 export type RootStackParamList = {
   Main: undefined;
-  AddExpense: { expense?: Expense };
+  AddExpense: { expense?: Expense; recurringExpense?: RecurringExpense };
   ManageCategory: { category?: Category };
+  ManageRecurring: { recurringExpense?: RecurringExpense };
 };
 
 export type TabParamList = {

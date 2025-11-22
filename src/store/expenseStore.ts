@@ -1,14 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Expense, Category } from '../types';
+import { Expense, Category, RecurringExpense, RecurrenceType } from '../types';
 
 // Default categories
 const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat_food',
     name: 'Food',
-    icon: 'fast-food',
+    icon: 'restaurant',
     color: '#F59E0B',
     isDefault: true,
     createdAt: new Date().toISOString(),
@@ -32,16 +32,8 @@ const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat_bills',
     name: 'Bills',
-    icon: 'document-text',
+    icon: 'receipt',
     color: '#EF4444',
-    isDefault: true,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'cat_sports',
-    name: 'Sports',
-    icon: 'barbell',
-    color: '#10B981',
     isDefault: true,
     createdAt: new Date().toISOString(),
   },
@@ -56,15 +48,15 @@ const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'cat_health',
     name: 'Health',
-    icon: 'medkit',
-    color: '#16A34A',
+    icon: 'fitness',
+    color: '#10B981',
     isDefault: true,
     createdAt: new Date().toISOString(),
   },
   {
     id: 'cat_other',
     name: 'Other',
-    icon: 'ellipsis-horizontal-circle',
+    icon: 'ellipsis-horizontal',
     color: '#6B7280',
     isDefault: true,
     createdAt: new Date().toISOString(),
@@ -74,6 +66,7 @@ const DEFAULT_CATEGORIES: Category[] = [
 interface ExpenseState {
   expenses: Expense[];
   categories: Category[];
+  recurringExpenses: RecurringExpense[];
   
   // Expense methods
   addExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => void;
@@ -90,6 +83,14 @@ interface ExpenseState {
   deleteCategory: (id: string, deleteExpenses?: boolean) => void;
   getCategoryById: (id: string) => Category | undefined;
   initializeCategories: () => void;
+  
+  // Recurring expense methods
+  addRecurringExpense: (recurringExpense: Omit<RecurringExpense, 'id' | 'createdAt'>) => void;
+  updateRecurringExpense: (id: string, recurringExpense: Partial<RecurringExpense>) => void;
+  deleteRecurringExpense: (id: string) => void;
+  toggleRecurringExpense: (id: string) => void;
+  getRecurringExpenseById: (id: string) => RecurringExpense | undefined;
+  generateRecurringExpenses: () => void;
 }
 
 export const useExpenseStore = create<ExpenseState>()(
@@ -97,6 +98,7 @@ export const useExpenseStore = create<ExpenseState>()(
     (set, get) => ({
       expenses: [],
       categories: [],
+      recurringExpenses: [],
 
       // Initialize default categories if empty
       initializeCategories: () => {
@@ -204,6 +206,101 @@ export const useExpenseStore = create<ExpenseState>()(
       getCategoryById: id => {
         return get().categories.find(category => category.id === id);
       },
+
+      // Recurring expense methods
+      addRecurringExpense: recurringExpense => {
+        const newRecurring: RecurringExpense = {
+          ...recurringExpense,
+          id: 'rec_' + Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          createdAt: new Date().toISOString(),
+        };
+        set(state => ({
+          recurringExpenses: [...state.recurringExpenses, newRecurring],
+        }));
+      },
+
+      updateRecurringExpense: (id, updatedData) => {
+        set(state => ({
+          recurringExpenses: state.recurringExpenses.map(recurring =>
+            recurring.id === id ? { ...recurring, ...updatedData } : recurring
+          ),
+        }));
+      },
+
+      deleteRecurringExpense: id => {
+        set(state => ({
+          recurringExpenses: state.recurringExpenses.filter(r => r.id !== id),
+          // Optionally keep the generated expenses or remove them
+          // For now, we'll keep them as historical records
+        }));
+      },
+
+      toggleRecurringExpense: id => {
+        set(state => ({
+          recurringExpenses: state.recurringExpenses.map(recurring =>
+            recurring.id === id ? { ...recurring, isActive: !recurring.isActive } : recurring
+          ),
+        }));
+      },
+
+      getRecurringExpenseById: id => {
+        return get().recurringExpenses.find(recurring => recurring.id === id);
+      },
+
+      generateRecurringExpenses: () => {
+        const now = new Date();
+        const { recurringExpenses, addExpense } = get();
+
+        recurringExpenses.forEach(recurring => {
+          if (!recurring.isActive) return;
+
+          const startDate = new Date(recurring.startDate);
+          const lastGenerated = recurring.lastGenerated 
+            ? new Date(recurring.lastGenerated) 
+            : new Date(startDate.getTime() - 1); // Start from before startDate
+
+          // Check if end date has passed
+          if (recurring.endDate && new Date(recurring.endDate) < now) {
+            return;
+          }
+
+          let shouldGenerate = false;
+          let nextDate = new Date(lastGenerated);
+
+          // Calculate if we need to generate based on recurrence type
+          switch (recurring.recurrenceType) {
+            case 'daily':
+              nextDate.setDate(lastGenerated.getDate() + 1);
+              shouldGenerate = nextDate <= now && nextDate >= startDate;
+              break;
+            case 'weekly':
+              nextDate.setDate(lastGenerated.getDate() + 7);
+              shouldGenerate = nextDate <= now && nextDate >= startDate;
+              break;
+            case 'monthly':
+              nextDate.setMonth(lastGenerated.getMonth() + 1);
+              shouldGenerate = nextDate <= now && nextDate >= startDate;
+              break;
+          }
+
+          if (shouldGenerate && recurring.recurrenceType !== 'none') {
+            // Generate the expense
+            addExpense({
+              title: recurring.title,
+              amount: recurring.amount,
+              categoryId: recurring.categoryId,
+              date: nextDate.toISOString(),
+              note: recurring.note,
+              recurringExpenseId: recurring.id,
+            });
+
+            // Update last generated date
+            get().updateRecurringExpense(recurring.id, {
+              lastGenerated: nextDate.toISOString(),
+            });
+          }
+        });
+      },
     }),
     {
       name: 'expense-storage',
@@ -212,6 +309,8 @@ export const useExpenseStore = create<ExpenseState>()(
         // Initialize categories after rehydration
         if (state) {
           state.initializeCategories();
+          // Generate any pending recurring expenses
+          state.generateRecurringExpenses();
         }
       },
     }
