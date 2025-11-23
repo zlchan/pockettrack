@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Expense, Category } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { formatCurrency } from '../utils/dateUtils';
+import { formatMultiCurrency } from '../utils/currencyUtils';
 import { theme } from '../constants/theme';
 
 interface ExpenseItemProps {
@@ -74,7 +75,9 @@ export const ExpenseItem: React.FC<ExpenseItemProps> = ({
       </View>
 
       <View style={styles.right}>
-        <Text style={styles.amount}>{formatCurrency(expense.amount)}</Text>
+        <Text style={styles.amount}>
+          {formatMultiCurrency(expense.amount, expense.originalAmount, expense.originalCurrency)}
+        </Text>
         <TouchableOpacity
           onPress={handleDelete}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}

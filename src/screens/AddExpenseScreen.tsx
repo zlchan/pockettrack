@@ -1,5 +1,3 @@
-// src/screens/AddExpenseScreen.tsx
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,9 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Platform,
   Alert,
   Keyboard,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -20,8 +18,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useExpenseStore } from '../store/expenseStore';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { NumericKeypad } from '../components/NumericKeypad';
-import { RootStackParamList } from '../types';
+import { CurrencyPicker } from '../components/CurrencyPicker';
+import { RootStackParamList, Currency } from '../types';
 import { theme } from '../constants/theme';
+import {
+  getDefaultCurrency,
+  getCurrencyByCode,
+  convertToBaseCurrency,
+  formatCurrencyWithCode,
+} from '../utils/currencyUtils';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddExpense'>;
 type AddExpenseRouteProp = RouteProp<RootStackParamList, 'AddExpense'>;
@@ -42,35 +47,49 @@ export const AddExpenseScreen = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [activeInput, setActiveInput] = useState<'amount' | 'title' | 'note' | null>('amount');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
+    expense?.originalCurrency ? getCurrencyByCode(expense.originalCurrency) : getDefaultCurrency()
+  );
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
-  // Initialize categories if empty
+  // Initialize default categories only if none exist
   useEffect(() => {
     const initStore = useExpenseStore.getState();
-    initStore.initializeCategories();
+    if (!initStore.categories || initStore.categories.length === 0) {
+      initStore.initializeCategories();
+    }
   }, []);
 
-  // Listen to keyboard events
+  // Keyboard listeners: show native keyboard state and restore numeric keypad on hide
   useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => {
-        setKeyboardVisible(true);
-      }
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        setKeyboardVisible(false);
-        // Return to amount input when device keyboard closes
-        setActiveInput('amount');
-      }
-    );
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+      // If user was editing title/note, return to amount input when keyboard closes
+      setActiveInput(prev => (prev === 'title' || prev === 'note' ? 'amount' : prev));
+    });
 
     return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
+      showSub.remove();
+      hideSub.remove();
     };
   }, []);
+
+  const handleTitleFocus = () => {
+    setActiveInput('title');
+  };
+
+  const handleNoteFocus = () => {
+    setActiveInput('note');
+  };
+
+  const handleAmountFocus = () => {
+    // Dismiss device keyboard if visible and show custom keypad
+    Keyboard.dismiss();
+    setActiveInput('amount');
+  };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
@@ -106,11 +125,19 @@ export const AddExpenseScreen = () => {
     if (!value) return '0.00';
     const num = parseFloat(value);
     if (isNaN(num)) return '0.00';
+
+    if (selectedCurrency.code === 'JPY' || selectedCurrency.code === 'IDR') {
+      return Math.round(num).toString();
+    }
     return num.toFixed(2);
   };
 
+  const handleCurrencySelect = (currency: Currency) => {
+    setSelectedCurrency(currency);
+    setAmount('');
+  };
+
   const handleSave = () => {
-    // Validate before saving
     if (!validateAndSave()) {
       return;
     }
@@ -133,40 +160,27 @@ export const AddExpenseScreen = () => {
       return false;
     }
 
+    const baseAmount =
+      selectedCurrency.code === 'MYR' ? parsedAmount : convertToBaseCurrency(parsedAmount, selectedCurrency.code);
+
+    const expenseData = {
+      title: title.trim(),
+      amount: baseAmount,
+      originalAmount: selectedCurrency.code !== 'MYR' ? parsedAmount : undefined,
+      originalCurrency: selectedCurrency.code !== 'MYR' ? selectedCurrency.code : undefined,
+      categoryId,
+      date: date.toISOString(),
+      note: note.trim(),
+    };
+
     if (isEdit && expense) {
-      updateExpense(expense.id, {
-        title: title.trim(),
-        amount: parsedAmount,
-        categoryId,
-        date: date.toISOString(),
-        note: note.trim(),
-      });
+      updateExpense(expense.id, expenseData);
     } else {
-      addExpense({
-        title: title.trim(),
-        amount: parsedAmount,
-        categoryId,
-        date: date.toISOString(),
-        note: note.trim(),
-      });
+      addExpense(expenseData);
     }
 
     navigation.goBack();
     return true;
-  };
-
-  const handleTitleFocus = () => {
-    setActiveInput('title');
-  };
-
-  const handleNoteFocus = () => {
-    setActiveInput('note');
-  };
-
-  const handleAmountFocus = () => {
-    // Dismiss device keyboard if visible
-    Keyboard.dismiss();
-    setActiveInput('amount');
   };
 
   return (
@@ -177,19 +191,13 @@ export const AddExpenseScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={28} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isEdit ? 'Edit Expense' : 'Add Expense'}
-          </Text>
+          <Text style={styles.headerTitle}>{isEdit ? 'Edit Expense' : 'Add Expense'}</Text>
           <View style={{ width: 28 }} />
         </View>
 
-        <ScrollView 
-          style={styles.content} 
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Amount Display */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[
               styles.amountContainer,
               activeInput === 'amount' && !keyboardVisible && styles.amountContainerActive,
@@ -197,28 +205,48 @@ export const AddExpenseScreen = () => {
             onPress={handleAmountFocus}
             activeOpacity={0.7}
           >
-            <Text style={styles.currencySymbol}>$</Text>
-            <Text style={[
-              styles.amountDisplay,
-              activeInput === 'amount' && !keyboardVisible && styles.amountDisplayActive,
-            ]}>
+            <TouchableOpacity style={styles.currencyButton} onPress={() => setShowCurrencyPicker(true)}>
+              <Text style={styles.currencySymbol}>{selectedCurrency.symbol}</Text>
+              <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+            <Text
+              style={[
+                styles.amountDisplay,
+                activeInput === 'amount' && !keyboardVisible && styles.amountDisplayActive,
+              ]}
+            >
               {formatAmountDisplay(amount)}
             </Text>
           </TouchableOpacity>
+
+          {/* Currency Info */}
+          {selectedCurrency.code !== 'MYR' && amount && (
+            <View style={styles.conversionInfo}>
+              <Ionicons name="swap-horizontal" size={16} color={theme.colors.textSecondary} />
+              <Text style={styles.conversionText}>
+                ≈{' '}
+                {formatCurrencyWithCode(
+                  convertToBaseCurrency(parseFloat(amount) || 0, selectedCurrency.code),
+                  'MYR'
+                )}
+              </Text>
+            </View>
+          )}
 
           {/* Title Input */}
           <View style={styles.section}>
             <Text style={styles.label}>Title</Text>
             <TextInput
-              style={[
-                styles.input,
-                activeInput === 'title' && styles.inputActive,
-              ]}
+              style={[styles.input, activeInput === 'title' && styles.inputActive]}
               value={title}
               onChangeText={setTitle}
               placeholder="e.g., Lunch at cafe"
               placeholderTextColor={theme.colors.textSecondary}
               onFocus={handleTitleFocus}
+              onBlur={() => {
+                setActiveInput('amount');
+                Keyboard.dismiss();
+              }}
               maxLength={50}
               returnKeyType="done"
               onSubmitEditing={handleAmountFocus}
@@ -228,10 +256,7 @@ export const AddExpenseScreen = () => {
           {/* Date Selector */}
           <View style={styles.section}>
             <Text style={styles.label}>Date</Text>
-            <TouchableOpacity
-              style={styles.dateSelector}
-              onPress={() => setShowDatePicker(true)}
-            >
+            <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
               <View style={styles.dateSelectorLeft}>
                 <Ionicons name="calendar-outline" size={24} color={theme.colors.text} />
                 <Text style={styles.dateSelectorText}>{formatDateDisplay(date)}</Text>
@@ -260,11 +285,7 @@ export const AddExpenseScreen = () => {
           {/* Category Selection */}
           <View style={styles.section}>
             <Text style={styles.label}>Category</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoryScroll}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
               {categories.map(cat => {
                 const isSelected = categoryId === cat.id;
                 return (
@@ -284,10 +305,7 @@ export const AddExpenseScreen = () => {
                     <Text
                       style={[
                         styles.categoryLabel,
-                        isSelected && { 
-                          color: theme.colors.text,
-                          fontWeight: theme.fontWeight.semibold,
-                        },
+                        isSelected && { color: theme.colors.text, fontWeight: theme.fontWeight.semibold },
                       ]}
                       numberOfLines={1}
                     >
@@ -303,11 +321,7 @@ export const AddExpenseScreen = () => {
           <View style={styles.section}>
             <Text style={styles.label}>Note (Optional)</Text>
             <TextInput
-              style={[
-                styles.input, 
-                styles.textArea,
-                activeInput === 'note' && styles.inputActive,
-              ]}
+              style={[styles.input, styles.textArea, activeInput === 'note' && styles.inputActive]}
               value={note}
               onChangeText={setNote}
               placeholder="Add a note..."
@@ -316,6 +330,13 @@ export const AddExpenseScreen = () => {
               numberOfLines={3}
               textAlignVertical="top"
               onFocus={handleNoteFocus}
+              onBlur={() => {
+                setActiveInput('amount');
+                Keyboard.dismiss();
+              }}
+              onEndEditing={() => {
+                setActiveInput('amount');
+              }}
               maxLength={200}
               returnKeyType="done"
               onSubmitEditing={handleAmountFocus}
@@ -325,15 +346,19 @@ export const AddExpenseScreen = () => {
 
           <View style={{ height: 20 }} />
         </ScrollView>
-        
+
         {/* Custom Numeric Keypad - Show when amount is active and device keyboard is hidden */}
         {activeInput === 'amount' && !keyboardVisible && (
-          <NumericKeypad
-            value={amount}
-            onValueChange={setAmount}
-            onSave={validateAndSave}
-          />
+          <NumericKeypad value={amount} onValueChange={setAmount} onSave={validateAndSave} currencySymbol={selectedCurrency.symbol} />
         )}
+
+        {/* Currency Picker Modal */}
+        <CurrencyPicker
+          visible={showCurrencyPicker}
+          selectedCurrency={selectedCurrency.code}
+          onSelect={handleCurrencySelect}
+          onClose={() => setShowCurrencyPicker(false)}
+        />
       </View>
     </SafeAreaView>
   );
@@ -372,7 +397,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: theme.spacing.xl,
     paddingHorizontal: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.lg,
     borderWidth: 2,
@@ -382,11 +407,17 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.text,
     backgroundColor: theme.colors.surface,
   },
+  currencyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: theme.spacing.sm,
+    padding: theme.spacing.xs,
+  },
   currencySymbol: {
     fontSize: 48,
     fontWeight: theme.fontWeight.bold,
-    color: theme.colors.textSecondary,
-    marginRight: theme.spacing.sm,
+    color: theme.colors.text,
+    marginRight: 4,
   },
   amountDisplay: {
     fontSize: 56,
@@ -396,6 +427,19 @@ const styles = StyleSheet.create({
   },
   amountDisplayActive: {
     color: theme.colors.text,
+  },
+  conversionInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.xs,
+    marginBottom: theme.spacing.lg,
+    paddingVertical: theme.spacing.xs,
+  },
+  conversionText: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.textSecondary,
+    fontWeight: theme.fontWeight.medium,
   },
   section: {
     marginBottom: theme.spacing.xl,

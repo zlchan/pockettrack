@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useExpenseStore } from '../store/expenseStore';
 import { SwipeableCategoryItem } from '../components/SwipeableCategoryItem';
 import { formatCurrency } from '../utils/dateUtils';
+import { formatWithDisplayCurrency } from '../utils/currencyUtils';
 import { theme } from '../constants/theme';
 import { RootStackParamList, Category } from '../types';
 
@@ -14,7 +15,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const CategoriesScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { categories, getTotalByCategory, getMonthlyTotal, deleteCategory, getExpensesByCategory } = useExpenseStore();
+  const { categories, getTotalByCategory, getMonthlyTotal, deleteCategory, getExpensesByCategory, displayCurrency } = useExpenseStore();
   const monthlyTotal = getMonthlyTotal();
 
   const categoryData = categories.map(cat => ({
@@ -107,7 +108,9 @@ export const CategoriesScreen = () => {
           <Text style={styles.headerTitle}>Categories</Text>
           <View style={styles.totalContainer}>
             <Text style={styles.totalLabel}>This Month</Text>
-            <Text style={styles.totalAmount}>{formatCurrency(monthlyTotal)}</Text>
+            <Text style={styles.totalAmount}>
+              {formatWithDisplayCurrency(monthlyTotal, displayCurrency)}
+            </Text>
           </View>
         </View>
       </View>
@@ -167,7 +170,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: theme.spacing.lg,
-    bottom: 100, // Above tab bar
+    bottom: 80, // Just above tab bar (was 100)
     width: 64,
     height: 64,
     borderRadius: 32,

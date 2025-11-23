@@ -7,10 +7,11 @@ import { MonthlySpendingChart } from '../components/MonthlySpendingChart';
 import { CategoryPieChart } from '../components/CategoryPieChart';
 import { WeeklyTrendChart } from '../components/WeeklyTrendChart';
 import { formatCurrency } from '../utils/dateUtils';
+import { formatWithDisplayCurrency } from '../utils/currencyUtils';
 import { theme } from '../constants/theme';
 
 export const SummaryScreen = () => {
-  const { expenses, categories, getCategoryById } = useExpenseStore();
+  const { expenses, categories, getCategoryById, displayCurrency } = useExpenseStore();
   const [filter, setFilter] = useState<FilterPeriod>('month');
   const fadeAnim = React.useRef(new Animated.Value(1)).current;
 
@@ -165,7 +166,7 @@ export const SummaryScreen = () => {
           <Text style={styles.sectionTitle}>{getPeriodLabel()}</Text>
           <View style={styles.mainCard}>
             <Text style={styles.mainAmount}>
-              {formatCurrency(stats.currentTotal)}
+              {formatWithDisplayCurrency(stats.currentTotal, displayCurrency)}
             </Text>
             <Text style={styles.mainSubtext}>
               {stats.transactionCount} transaction{stats.transactionCount !== 1 ? 's' : ''}
@@ -194,7 +195,9 @@ export const SummaryScreen = () => {
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
               <Text style={styles.statLabel}>Average</Text>
-              <Text style={styles.statValue}>{formatCurrency(stats.avgExpense)}</Text>
+              <Text style={styles.statValue}>
+                {formatWithDisplayCurrency(stats.avgExpense, displayCurrency)}
+              </Text>
               <Text style={styles.statSublabel}>per transaction</Text>
             </View>
             <View style={styles.statCard}>

@@ -67,6 +67,7 @@ interface ExpenseState {
   expenses: Expense[];
   categories: Category[];
   recurringExpenses: RecurringExpense[];
+  displayCurrency: string; // Global display currency
   
   // Expense methods
   addExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => void;
@@ -91,6 +92,9 @@ interface ExpenseState {
   toggleRecurringExpense: (id: string) => void;
   getRecurringExpenseById: (id: string) => RecurringExpense | undefined;
   generateRecurringExpenses: () => void;
+  
+  // Currency methods
+  setDisplayCurrency: (currencyCode: string) => void;
 }
 
 export const useExpenseStore = create<ExpenseState>()(
@@ -99,6 +103,7 @@ export const useExpenseStore = create<ExpenseState>()(
       expenses: [],
       categories: [],
       recurringExpenses: [],
+      displayCurrency: 'MYR', // Default to MYR
 
       // Initialize default categories if empty
       initializeCategories: () => {
@@ -300,6 +305,11 @@ export const useExpenseStore = create<ExpenseState>()(
             });
           }
         });
+      },
+      
+      // Currency methods
+      setDisplayCurrency: (currencyCode: string) => {
+        set({ displayCurrency: currencyCode });
       },
     }),
     {

@@ -8,6 +8,7 @@ interface NumericKeypadProps {
   onValueChange: (value: string) => void;
   onSave?: () => void;
   maxValue?: number;
+  currencySymbol?: string;
 }
 
 export const NumericKeypad: React.FC<NumericKeypadProps> = ({
@@ -15,6 +16,7 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
   onValueChange,
   onSave,
   maxValue = 999999.99,
+  currencySymbol = 'RM',
 }) => {
   const [operator, setOperator] = useState<'+' | '-' | null>(null);
   const [firstOperand, setFirstOperand] = useState<string>('');
@@ -144,7 +146,6 @@ export const NumericKeypad: React.FC<NumericKeypadProps> = ({
         <KeyButton label="1" onPress={() => handlePress('1')} />
         <KeyButton label="2" onPress={() => handlePress('2')} />
         <KeyButton label="3" onPress={() => handlePress('3')} />
-        <KeyButton label="" onPress={() => handlePress('')} variant="operator"  />
       </View>
 
       <View style={styles.row}>

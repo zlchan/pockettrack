@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useExpenseStore } from '../store/expenseStore';
 import { CategoryIcon } from '../components/CategoryIcon';
 import { formatCurrency } from '../utils/dateUtils';
+import { formatWithDisplayCurrency } from '../utils/currencyUtils';
 import { theme } from '../constants/theme';
 import { RootStackParamList, RecurringExpense } from '../types';
 
@@ -14,7 +15,7 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const RecurringListScreen = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { recurringExpenses, getCategoryById, deleteRecurringExpense, toggleRecurringExpense } = useExpenseStore();
+  const { recurringExpenses, getCategoryById, deleteRecurringExpense, toggleRecurringExpense, displayCurrency } = useExpenseStore();
 
   const handleAdd = () => {
     navigation.navigate('ManageRecurring', {});
@@ -63,7 +64,9 @@ export const RecurringListScreen = () => {
         </View>
 
         <View style={styles.right}>
-          <Text style={styles.amount}>{formatCurrency(item.amount)}</Text>
+          <Text style={styles.amount}>
+            {formatWithDisplayCurrency(item.amount, displayCurrency)}
+          </Text>
           <View style={styles.actions}>
             <Switch
               value={item.isActive}
@@ -130,7 +133,7 @@ const styles = StyleSheet.create({
   amount: { fontSize: theme.fontSize.lg, fontWeight: theme.fontWeight.bold, color: theme.colors.text },
   actions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   switch: { transform: [{ scale: 0.8 }] },
-  fab: { position: 'absolute', right: theme.spacing.lg, bottom: 100, width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.text, justifyContent: 'center', alignItems: 'center', ...theme.shadows.medium, elevation: 8 },
+  fab: { position: 'absolute', right: theme.spacing.lg, bottom: 80, width: 64, height: 64, borderRadius: 32, backgroundColor: theme.colors.text, justifyContent: 'center', alignItems: 'center', ...theme.shadows.medium, elevation: 8 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: theme.spacing.xxl * 3 },
   emptyText: { fontSize: theme.fontSize.lg, fontWeight: theme.fontWeight.semibold, color: theme.colors.text, marginTop: theme.spacing.lg },
   emptySubtext: { fontSize: theme.fontSize.md, color: theme.colors.textSecondary, marginTop: theme.spacing.sm },

@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Category } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { formatCurrency } from '../utils/dateUtils';
+import { formatWithDisplayCurrency } from '../utils/currencyUtils';
+import { useExpenseStore } from '../store/expenseStore';
 import { theme } from '../constants/theme';
 
 const SWIPE_THRESHOLD = 80;
@@ -36,6 +38,7 @@ export const SwipeableCategoryItem: React.FC<SwipeableCategoryItemProps> = ({
   onDelete,
 }) => {
   const translateX = useRef(new Animated.Value(0)).current;
+  const displayCurrency = useExpenseStore(state => state.displayCurrency);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -171,7 +174,7 @@ export const SwipeableCategoryItem: React.FC<SwipeableCategoryItemProps> = ({
               { color: amount > 0 ? theme.colors.text : theme.colors.textSecondary },
             ]}
           >
-            {formatCurrency(amount)}
+            {formatWithDisplayCurrency(amount, displayCurrency)}
           </Text>
         </TouchableOpacity>
       </Animated.View>
