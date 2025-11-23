@@ -5,10 +5,10 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  ScrollView,
   Alert,
   Keyboard,
-  Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -21,12 +21,13 @@ import { NumericKeypad } from '../components/NumericKeypad';
 import { CurrencyPicker } from '../components/CurrencyPicker';
 import { RootStackParamList, Currency } from '../types';
 import { theme } from '../constants/theme';
-import {
-  getDefaultCurrency,
-  getCurrencyByCode,
+import { 
+  getDefaultCurrency, 
+  getCurrencyByCode, 
   convertToBaseCurrency,
   formatCurrencyWithCode,
 } from '../utils/currencyUtils';
+import { Platform } from 'react-native';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddExpense'>;
 type AddExpenseRouteProp = RouteProp<RootStackParamList, 'AddExpense'>;
@@ -45,65 +46,34 @@ export const AddExpenseScreen = () => {
   const [note, setNote] = useState(expense?.note || '');
   const [date, setDate] = useState(expense?.date ? new Date(expense.date) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [activeInput, setActiveInput] = useState<'amount' | 'title' | 'note' | null>('amount');
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
-    expense?.originalCurrency ? getCurrencyByCode(expense.originalCurrency) : getDefaultCurrency()
+    expense?.originalCurrency 
+      ? getCurrencyByCode(expense.originalCurrency)
+      : getDefaultCurrency()
   );
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
 
-  // Initialize default categories only if none exist
   useEffect(() => {
-    const initStore = useExpenseStore.getState();
-    if (!initStore.categories || initStore.categories.length === 0) {
-      initStore.initializeCategories();
-    }
-  }, []);
-
-  // Keyboard listeners: show native keyboard state and restore numeric keypad on hide
-  useEffect(() => {
-    const showSub = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
-    });
-    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
       setKeyboardVisible(false);
-      // If user was editing title/note, return to amount input when keyboard closes
-      setActiveInput(prev => (prev === 'title' || prev === 'note' ? 'amount' : prev));
+      if (activeInput === 'title' || activeInput === 'note') {
+        setActiveInput('amount');
+      }
     });
-
     return () => {
-      showSub.remove();
-      hideSub.remove();
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
     };
-  }, []);
-
-  const handleTitleFocus = () => {
-    setActiveInput('title');
-  };
-
-  const handleNoteFocus = () => {
-    setActiveInput('note');
-  };
-
-  const handleAmountFocus = () => {
-    // Dismiss device keyboard if visible and show custom keypad
-    Keyboard.dismiss();
-    setActiveInput('amount');
-  };
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setDate(selectedDate);
-    }
-  };
+  }, [activeInput]);
 
   const formatDateDisplay = (date: Date): string => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
 
     const isSameDay = (d1: Date, d2: Date) =>
       d1.getFullYear() === d2.getFullYear() &&
@@ -112,7 +82,6 @@ export const AddExpenseScreen = () => {
 
     if (isSameDay(date, today)) return 'Today';
     if (isSameDay(date, yesterday)) return 'Yesterday';
-    if (isSameDay(date, tomorrow)) return 'Tomorrow';
 
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -125,7 +94,7 @@ export const AddExpenseScreen = () => {
     if (!value) return '0.00';
     const num = parseFloat(value);
     if (isNaN(num)) return '0.00';
-
+    
     if (selectedCurrency.code === 'JPY' || selectedCurrency.code === 'IDR') {
       return Math.round(num).toString();
     }
@@ -137,9 +106,15 @@ export const AddExpenseScreen = () => {
     setAmount('');
   };
 
-  const handleSave = () => {
-    if (!validateAndSave()) {
-      return;
+  const handleAmountFocus = () => {
+    Keyboard.dismiss();
+    setActiveInput('amount');
+  };
+
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setDate(selectedDate);
     }
   };
 
@@ -160,8 +135,9 @@ export const AddExpenseScreen = () => {
       return false;
     }
 
-    const baseAmount =
-      selectedCurrency.code === 'MYR' ? parsedAmount : convertToBaseCurrency(parsedAmount, selectedCurrency.code);
+    const baseAmount = selectedCurrency.code === 'MYR' 
+      ? parsedAmount 
+      : convertToBaseCurrency(parsedAmount, selectedCurrency.code);
 
     const expenseData = {
       title: title.trim(),
@@ -183,6 +159,8 @@ export const AddExpenseScreen = () => {
     return true;
   };
 
+  const selectedCategory = getCategoryById(categoryId);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.flex}>
@@ -191,13 +169,15 @@ export const AddExpenseScreen = () => {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={28} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{isEdit ? 'Edit Expense' : 'Add Expense'}</Text>
+          <Text style={styles.headerTitle}>
+            {isEdit ? 'Edit Expense' : 'Add Expense'}
+          </Text>
           <View style={{ width: 28 }} />
         </View>
 
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.content}>
           {/* Amount Display */}
-          <TouchableOpacity
+          <TouchableOpacity 
             style={[
               styles.amountContainer,
               activeInput === 'amount' && !keyboardVisible && styles.amountContainerActive,
@@ -205,27 +185,24 @@ export const AddExpenseScreen = () => {
             onPress={handleAmountFocus}
             activeOpacity={0.7}
           >
-            <TouchableOpacity style={styles.currencyButton} onPress={() => setShowCurrencyPicker(true)}>
+            <TouchableOpacity 
+              style={styles.currencyButton}
+              onPress={() => setShowCurrencyPicker(true)}
+            >
               <Text style={styles.currencySymbol}>{selectedCurrency.symbol}</Text>
               <Ionicons name="chevron-down" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
-            <Text
-              style={[
-                styles.amountDisplay,
-                activeInput === 'amount' && !keyboardVisible && styles.amountDisplayActive,
-              ]}
-            >
+            <Text style={styles.amountDisplay}>
               {formatAmountDisplay(amount)}
             </Text>
           </TouchableOpacity>
 
-          {/* Currency Info */}
+          {/* Conversion Info */}
           {selectedCurrency.code !== 'MYR' && amount && (
             <View style={styles.conversionInfo}>
               <Ionicons name="swap-horizontal" size={16} color={theme.colors.textSecondary} />
               <Text style={styles.conversionText}>
-                ≈{' '}
-                {formatCurrencyWithCode(
+                ≈ {formatCurrencyWithCode(
                   convertToBaseCurrency(parseFloat(amount) || 0, selectedCurrency.code),
                   'MYR'
                 )}
@@ -234,123 +211,128 @@ export const AddExpenseScreen = () => {
           )}
 
           {/* Title Input */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Title</Text>
-            <TextInput
-              style={[styles.input, activeInput === 'title' && styles.inputActive]}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="e.g., Lunch at cafe"
-              placeholderTextColor={theme.colors.textSecondary}
-              onFocus={handleTitleFocus}
-              onBlur={() => {
-                setActiveInput('amount');
-                Keyboard.dismiss();
-              }}
-              maxLength={50}
-              returnKeyType="done"
-              onSubmitEditing={handleAmountFocus}
-            />
-          </View>
+          <TextInput
+            style={[styles.input, activeInput === 'title' && styles.inputActive]}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="What did you spend on?"
+            placeholderTextColor={theme.colors.textSecondary}
+            onFocus={() => setActiveInput('title')}
+            maxLength={50}
+            returnKeyType="done"
+            onSubmitEditing={handleAmountFocus}
+          />
 
-          {/* Date Selector */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Date</Text>
-            <TouchableOpacity style={styles.dateSelector} onPress={() => setShowDatePicker(true)}>
-              <View style={styles.dateSelectorLeft}>
-                <Ionicons name="calendar-outline" size={24} color={theme.colors.text} />
-                <Text style={styles.dateSelectorText}>{formatDateDisplay(date)}</Text>
-              </View>
-              <Text style={styles.dateSelectorSubtext}>
-                {date.toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  month: 'long',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </Text>
+          {/* Date and Category Row */}
+          <View style={styles.pickerRow}>
+            {/* Date Picker */}
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.text} />
+              <Text style={styles.pickerText}>{formatDateDisplay(date)}</Text>
             </TouchableOpacity>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={date}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={handleDateChange}
-                maximumDate={new Date()}
-              />
-            )}
-          </View>
-
-          {/* Category Selection */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Category</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScroll}>
-              {categories.map(cat => {
-                const isSelected = categoryId === cat.id;
-                return (
-                  <TouchableOpacity
-                    key={cat.id}
-                    style={[
-                      styles.categoryItem,
-                      isSelected && {
-                        backgroundColor: cat.color + '10',
-                        borderColor: cat.color,
-                        borderWidth: 2,
-                      },
-                    ]}
-                    onPress={() => setCategoryId(cat.id)}
-                  >
-                    <CategoryIcon icon={cat.icon} color={cat.color} size={40} />
-                    <Text
-                      style={[
-                        styles.categoryLabel,
-                        isSelected && { color: theme.colors.text, fontWeight: theme.fontWeight.semibold },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {cat.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+            {/* Category Picker */}
+            <TouchableOpacity
+              style={styles.pickerButton}
+              onPress={() => setShowCategoryPicker(true)}
+            >
+              {selectedCategory && (
+                <CategoryIcon 
+                  icon={selectedCategory.icon} 
+                  color={selectedCategory.color} 
+                  size={24} 
+                />
+              )}
+              <Text style={styles.pickerText} numberOfLines={1}>
+                {selectedCategory?.name || 'Category'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
           </View>
 
           {/* Note Input */}
-          <View style={styles.section}>
-            <Text style={styles.label}>Note (Optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea, activeInput === 'note' && styles.inputActive]}
-              value={note}
-              onChangeText={setNote}
-              placeholder="Add a note..."
-              placeholderTextColor={theme.colors.textSecondary}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-              onFocus={handleNoteFocus}
-              onBlur={() => {
-                setActiveInput('amount');
-                Keyboard.dismiss();
-              }}
-              onEndEditing={() => {
-                setActiveInput('amount');
-              }}
-              maxLength={200}
-              returnKeyType="done"
-              onSubmitEditing={handleAmountFocus}
-              blurOnSubmit={true}
-            />
-          </View>
+          <TextInput
+            style={[styles.input, styles.noteInput, activeInput === 'note' && styles.inputActive]}
+            value={note}
+            onChangeText={setNote}
+            placeholder="Add a note (optional)"
+            placeholderTextColor={theme.colors.textSecondary}
+            multiline
+            numberOfLines={2}
+            textAlignVertical="top"
+            onFocus={() => setActiveInput('note')}
+            maxLength={200}
+            returnKeyType="done"
+            onSubmitEditing={handleAmountFocus}
+            blurOnSubmit={true}
+          />
+        </View>
 
-          <View style={{ height: 20 }} />
-        </ScrollView>
-
-        {/* Custom Numeric Keypad - Show when amount is active and device keyboard is hidden */}
+        {/* Custom Numeric Keypad */}
         {activeInput === 'amount' && !keyboardVisible && (
-          <NumericKeypad value={amount} onValueChange={setAmount} onSave={validateAndSave} currencySymbol={selectedCurrency.symbol} />
+          <NumericKeypad
+            value={amount}
+            onValueChange={setAmount}
+            onSave={validateAndSave}
+            currencySymbol={selectedCurrency.symbol}
+          />
         )}
+
+        {/* Date Picker Modal */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleDateChange}
+            maximumDate={new Date()}
+          />
+        )}
+
+        {/* Category Picker Modal */}
+        <Modal
+          visible={showCategoryPicker}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setShowCategoryPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Category</Text>
+                <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
+                  <Ionicons name="close" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+              </View>
+              <FlatList
+                data={categories}
+                numColumns={3}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryItem,
+                      categoryId === item.id && styles.categoryItemActive,
+                    ]}
+                    onPress={() => {
+                      setCategoryId(item.id);
+                      setShowCategoryPicker(false);
+                    }}
+                  >
+                    <CategoryIcon icon={item.icon} color={item.color} size={40} />
+                    <Text style={styles.categoryLabel} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                contentContainerStyle={styles.categoryGrid}
+              />
+            </View>
+          </View>
+        </Modal>
 
         {/* Currency Picker Modal */}
         <CurrencyPicker
@@ -405,7 +387,6 @@ const styles = StyleSheet.create({
   },
   amountContainerActive: {
     borderColor: theme.colors.text,
-    backgroundColor: theme.colors.surface,
   },
   currencyButton: {
     flexDirection: 'row',
@@ -425,32 +406,18 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     minWidth: 150,
   },
-  amountDisplayActive: {
-    color: theme.colors.text,
-  },
   conversionInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: theme.spacing.xs,
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
     paddingVertical: theme.spacing.xs,
   },
   conversionText: {
     fontSize: theme.fontSize.md,
     color: theme.colors.textSecondary,
     fontWeight: theme.fontWeight.medium,
-  },
-  section: {
-    marginBottom: theme.spacing.xl,
-  },
-  label: {
-    fontSize: theme.fontSize.sm,
-    fontWeight: theme.fontWeight.semibold,
-    color: theme.colors.textSecondary,
-    marginBottom: theme.spacing.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   input: {
     backgroundColor: theme.colors.surface,
@@ -460,54 +427,83 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     borderWidth: 2,
     borderColor: theme.colors.border,
+    marginBottom: theme.spacing.md,
   },
   inputActive: {
     borderColor: theme.colors.text,
   },
-  textArea: {
-    minHeight: 100,
+  noteInput: {
+    minHeight: 80,
   },
-  dateSelector: {
+  pickerRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.md,
+  },
+  pickerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
     padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     borderWidth: 2,
     borderColor: theme.colors.border,
   },
-  dateSelectorLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.xs,
+  pickerText: {
+    flex: 1,
+    fontSize: theme.fontSize.md,
+    color: theme.colors.text,
+    fontWeight: theme.fontWeight.medium,
   },
-  dateSelectorText: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: theme.colors.surface,
+    borderTopLeftRadius: theme.borderRadius.xl,
+    borderTopRightRadius: theme.borderRadius.xl,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  modalTitle: {
     fontSize: theme.fontSize.lg,
     fontWeight: theme.fontWeight.semibold,
     color: theme.colors.text,
-    marginLeft: theme.spacing.sm,
   },
-  dateSelectorSubtext: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.textSecondary,
-    marginLeft: 32,
-  },
-  categoryScroll: {
-    paddingRight: theme.spacing.lg,
+  categoryGrid: {
+    padding: theme.spacing.md,
   },
   categoryItem: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     padding: theme.spacing.md,
+    margin: theme.spacing.xs,
     borderRadius: theme.borderRadius.md,
-    marginRight: theme.spacing.md,
-    minWidth: 90,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.background,
+    minWidth: 100,
+    maxWidth: 120,
+  },
+  categoryItemActive: {
+    backgroundColor: theme.colors.text + '10',
     borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderColor: theme.colors.text,
   },
   categoryLabel: {
     fontSize: theme.fontSize.xs,
-    color: theme.colors.textSecondary,
+    color: theme.colors.text,
     marginTop: theme.spacing.xs,
     textAlign: 'center',
+    fontWeight: theme.fontWeight.medium,
   },
 });
