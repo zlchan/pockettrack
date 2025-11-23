@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { RecurringExpense, Category } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { formatCurrency } from '../utils/dateUtils';
+import { formatWithDisplayCurrency } from '../utils/currencyUtils';
+import { useExpenseStore } from '../store/expenseStore';
 import { theme } from '../constants/theme';
 
 interface UpcomingRecurringCardProps {
@@ -19,6 +21,8 @@ export const UpcomingRecurringCard: React.FC<UpcomingRecurringCardProps> = ({
   nextDate,
   onPress,
 }) => {
+  const displayCurrency = useExpenseStore(state => state.displayCurrency);
+
   const getTimeUntil = (): string => {
     const now = new Date();
     const diffTime = nextDate.getTime() - now.getTime();
@@ -66,7 +70,9 @@ export const UpcomingRecurringCard: React.FC<UpcomingRecurringCardProps> = ({
       </View>
 
       <View style={styles.right}>
-        <Text style={styles.amount}>{formatCurrency(recurring.amount)}</Text>
+        <Text style={styles.amount}>
+          {formatWithDisplayCurrency(recurring.amount, displayCurrency)}
+        </Text>
         <Ionicons name="chevron-forward" size={16} color={theme.colors.textSecondary} />
       </View>
     </TouchableOpacity>

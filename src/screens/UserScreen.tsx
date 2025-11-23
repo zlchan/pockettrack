@@ -1,22 +1,33 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { RootStackParamList } from '../types';
 import { useExpenseStore } from '../store/expenseStore';
 import { theme } from '../constants/theme';
-
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types';
+import { CurrencyPicker } from '../components/CurrencyPicker';
+import {
+  getCurrencyByCode
+} from '../utils/currencyUtils';
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 export const UserScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const expenses = useExpenseStore(state => state.expenses);
   const recurringExpenses = useExpenseStore(state => state.recurringExpenses);
+  const displayCurrency = useExpenseStore(state => state.displayCurrency);
+  const setDisplayCurrency = useExpenseStore(state => state.setDisplayCurrency);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const fadeAnim = React.useRef(new Animated.Value(1)).current;
 
   const handleNavigateToRecurring = () => {
     navigation.navigate('RecurringList' as never);
+  };
+
+  const handleCurrencyChange = (currency: any) => {
+    setDisplayCurrency(currency.code);
   };
 
   const handleClearData = () => {
@@ -90,7 +101,24 @@ export const UserScreen = () => {
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
 
-      <View style={styles.content}>
+      <Animated.ScrollView 
+        style={[styles.content, { opacity: fadeAnim }]}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Display Currency */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Display</Text>
+          <View style={styles.card}>
+            <SettingItem
+              icon="cash-outline"
+              label="Display Currency"
+              value={`${getCurrencyByCode(displayCurrency).symbol} ${displayCurrency}`}
+              onPress={() => setShowCurrencyPicker(true)}
+            />
+          </View>
+        </View>
+
         {/* Recurring Expenses */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Automation</Text>
@@ -146,7 +174,15 @@ export const UserScreen = () => {
         <Text style={styles.footer}>
           Made with ❤️ for simple expense tracking
         </Text>
-      </View>
+      </Animated.ScrollView>
+
+      {/* Currency Picker Modal */}
+      <CurrencyPicker
+        visible={showCurrencyPicker}
+        selectedCurrency={displayCurrency}
+        onSelect={handleCurrencyChange}
+        onClose={() => setShowCurrencyPicker(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -167,10 +203,19 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
   },
+  // Fix: provide a defined style for the ScrollView wrapper
+  scrollView: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
   content: {
     flex: 1,
     padding: theme.spacing.lg,
     paddingBottom: 100, // Extra space for tab bar
+  },
+  scrollContent: {
+    padding: theme.spacing.lg,
+    paddingBottom: 100,
   },
   section: {
     marginBottom: theme.spacing.xl,

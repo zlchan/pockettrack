@@ -15,6 +15,7 @@ import { useExpenseStore } from '../store/expenseStore';
 import { SwipeableExpenseItem } from '../components/SwipeableExpenseItem';
 import { UpcomingRecurringCard } from '../components/UpcomingRecurringCard';
 import { groupExpensesByDate, formatDate, formatCurrency, getNextOccurrence } from '../utils/dateUtils';
+import { formatWithDisplayCurrency } from '../utils/currencyUtils';
 import { theme } from '../constants/theme';
 import { RootStackParamList } from '../types';
 
@@ -31,6 +32,7 @@ export const HomeScreen = () => {
     getCategoryById, 
     initializeCategories,
     recurringExpenses,
+    displayCurrency,
   } = useExpenseStore();
   
   const scaleAnim = React.useRef(new Animated.Value(1)).current;
@@ -160,7 +162,9 @@ export const HomeScreen = () => {
         <View style={styles.header}>
           <View>
             <Text style={styles.headerSubtitle}>This Month</Text>
-            <Text style={styles.headerAmount}>{formatCurrency(monthlyTotal)}</Text>
+            <Text style={styles.headerAmount}>
+              {formatWithDisplayCurrency(monthlyTotal, displayCurrency)}
+            </Text>
           </View>
         </View>
 
@@ -315,7 +319,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: theme.spacing.lg,
-    bottom: 100, // Above tab bar
+    bottom: 80, // Just above tab bar (was 100)
     width: 64,
     height: 64,
     borderRadius: 32,
