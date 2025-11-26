@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import { CurrencyPicker } from '../components/CurrencyPicker';
+import { BackupService } from '../services/BackupService';
 import {
   getCurrencyByCode
 } from '../utils/currencyUtils';
@@ -20,7 +21,94 @@ export const UserScreen = () => {
   const displayCurrency = useExpenseStore(state => state.displayCurrency);
   const setDisplayCurrency = useExpenseStore(state => state.setDisplayCurrency);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
+  const [backupInfo, setBackupInfo] = useState({
+    hasBackup: false,
+    expenseCount: 0,
+    categoryCount: 0,
+    recurringCount: 0,
+    lastBackupDate: null as string | null,
+  });
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const fadeAnim = React.useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    loadBackupInfo();
+  }, []);
+
+  const loadBackupInfo = async () => {
+    const info = await BackupService.getBackupInfo();
+    setBackupInfo(info);
+  };
+
+  const handleExportJSON = async () => {
+    Alert.alert(
+      'Export Data',
+      'Export all your data to a JSON file. You can use this to restore your data later.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Export',
+          onPress: async () => {
+            setIsExporting(true);
+            const success = await BackupService.exportData();
+            setIsExporting(false);
+            if (success) {
+              await BackupService.createAutoBackup();
+              await loadBackupInfo();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleExportCSV = async () => {
+    Alert.alert(
+      'Export as CSV',
+      'Export your expenses to a CSV file for use in spreadsheet applications.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Export',
+          onPress: async () => {
+            setIsExporting(true);
+            await BackupService.exportAsCSV();
+            setIsExporting(false);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleImportData = async () => {
+    Alert.alert(
+      'Import Data',
+      'Import data from a backup file. This will replace your current data.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          onPress: async () => {
+            setIsImporting(true);
+            const success = await BackupService.importData();
+            setIsImporting(false);
+            if (success) {
+              await loadBackupInfo();
+              // Reload the app state
+              setTimeout(() => {
+                Alert.alert(
+                  'Success',
+                  'Data imported successfully. Please restart the app to see all changes.',
+                  [{ text: 'OK' }]
+                );
+              }, 500);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleNavigateToRecurring = () => {
     navigation.navigate('RecurringList' as never);
@@ -45,6 +133,7 @@ export const UserScreen = () => {
               useExpenseStore.getState().deleteExpense(expense.id);
             });
             Alert.alert('Success', 'All data has been cleared');
+            loadBackupInfo();
           },
         },
       ]
@@ -106,6 +195,38 @@ export const UserScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* Backup & Restore */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Backup & Restore</Text>
+          <View style={styles.card}>
+            <SettingItem
+              icon="cloud-upload-outline"
+              label="Export Data (Backup)"
+              value={isExporting ? 'Exporting...' : undefined}
+              onPress={!isExporting ? handleExportJSON : undefined}
+            />
+            <View style={styles.divider} />
+            <SettingItem
+              icon="document-text-outline"
+              label="Export as CSV"
+              value={isExporting ? 'Exporting...' : undefined}
+              onPress={!isExporting ? handleExportCSV : undefined}
+            />
+            <View style={styles.divider} />
+            <SettingItem
+              icon="cloud-download-outline"
+              label="Import Data"
+              value={isImporting ? 'Importing...' : undefined}
+              onPress={!isImporting ? handleImportData : undefined}
+            />
+          </View>
+          {backupInfo.hasBackup && (
+            <Text style={styles.backupInfo}>
+              Current data: {backupInfo.expenseCount} expenses, {backupInfo.categoryCount} categories
+            </Text>
+          )}
+        </View>
+
         {/* Display Currency */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Display</Text>
@@ -203,15 +324,8 @@ const styles = StyleSheet.create({
     fontWeight: theme.fontWeight.bold,
     color: theme.colors.text,
   },
-  // Fix: provide a defined style for the ScrollView wrapper
-  scrollView: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
   content: {
     flex: 1,
-    padding: theme.spacing.lg,
-    paddingBottom: 100, // Extra space for tab bar
   },
   scrollContent: {
     padding: theme.spacing.lg,
@@ -258,6 +372,12 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: theme.colors.border,
     marginLeft: theme.spacing.md + 24 + theme.spacing.md,
+  },
+  backupInfo: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.sm,
   },
   footer: {
     textAlign: 'center',
